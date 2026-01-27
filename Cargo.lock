@@ -33,9 +33,9 @@ dependencies = [
 
 [[package]]
 name = "atomhold"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "977bd28fa08359695ce2588afbd84f2a9c05d1d6b5f3cd25b7c4c6573fc1464e"
+checksum = "3574184848501db5b09b0ee4e980483117c930ad56165a066a6de2c0c81add43"
 dependencies = [
  "arc-swap",
  "thiserror",
@@ -193,13 +193,12 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "fmtstruct"
-version = "0.2.3"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48ac22fdf521596b0c12c4d69466abbe08013c45d1c5e309a0d232d39cf2ec89"
+checksum = "5b85eee00b66c773f43b1a9dfc84830a5604995d194390de95add6006eb03073"
 dependencies = [
  "async-trait",
  "fancy-regex",
- "log",
  "postcard",
  "serde",
  "serde_json",
@@ -236,9 +235,9 @@ dependencies = [
 
 [[package]]
 name = "fsig"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21c6449313c3f512fbc3aea5a939da26353f79843b2d3d13cb05a708ec759d44"
+checksum = "9aca5128faa89622ae1fb9ee2ea43c10f50b9ba436f15840e4715fb905deff0a"
 dependencies = [
  "futures-util",
  "globset",
@@ -247,7 +246,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tracing",
 ]
 
 [[package]]
@@ -508,12 +506,11 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
 name = "live"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "atomhold",
  "fmtstruct",
  "fsig",
- "log",
  "serde",
  "tempfile",
  "thiserror",
@@ -1037,37 +1034,6 @@ name = "toml_writer"
 version = "1.0.6+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
-
-[[package]]
-name = "tracing"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
-dependencies = [
- "pin-project-lite",
- "tracing-attributes",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-attributes"
-version = "0.1.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7490cfa5ec963746568740651ac6781f701c9c5ea257c58e057f3ba8cf69e8da"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "tracing-core"
-version = "0.1.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
-dependencies = [
- "once_cell",
-]
 
 [[package]]
 name = "unicode-ident"

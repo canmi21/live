@@ -1,4 +1,5 @@
-//! A modular configuration framework with live reloading.
+/* src/lib.rs */
+
 //!
 //! This crate integrates three components:
 //!
@@ -18,7 +19,6 @@
 //! - `fs`, `json`, `toml`, `yaml`, `postcard`: Loader format/source features.
 //! - `validate`, `regex`: Validation features.
 //! - `match`, `stream`: Signal features.
-//! - `logging`: Enables logging.
 //!
 //! ## Basic Usage
 //!

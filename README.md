@@ -47,7 +47,6 @@ live = { version = "0.3", features = ["full"] }
 | `regex` | Enables regex validation (requires `validate`). |
 | `match` | Enables glob pattern matching for `Watcher`. |
 | `stream` | Enables `Stream` API for `Watcher`. |
-| `logging` | Enables logging via `log` crate. |
 | `full` | Enables all features above. |
 
 ## License

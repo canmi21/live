@@ -1,4 +1,4 @@
-//! Error types for the Live controller.
+/* src/controller/error.rs */
 
 use atomhold::HoldError;
 use fmtstruct::FmtError;

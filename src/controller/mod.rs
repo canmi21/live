@@ -1,4 +1,5 @@
-//! The `Live` controller for live-reloading configuration.
+/* src/controller/mod.rs */
+
 //!
 //! Binds a `Store` to a `Loader` and optionally a `Watcher`.
 
@@ -14,9 +15,6 @@ use fsig::{Config as WatcherConfig, Target, Watcher};
 use tokio::sync::Mutex;
 #[cfg(feature = "signal")]
 use tokio::task::JoinHandle;
-
-#[cfg(feature = "logging")]
-use log::{error, info, warn};
 
 pub mod error;
 pub use error::LiveError;
@@ -127,23 +125,16 @@ where
 					.await
 					.unwrap_or(info.path);
 
-				#[cfg(feature = "logging")]
-				info!("Loaded config '{}' from {:?}", self.key, source_path);
-
-				self.store
-					.insert(self.key.clone(), value, source_path, UnloadPolicy::default());
+				self.store.insert(
+					self.key.clone(),
+					value,
+					source_path,
+					UnloadPolicy::default(),
+				);
 				Ok(())
 			}
-			LoadResult::NotFound => {
-				#[cfg(feature = "logging")]
-				warn!("Config not found: {}", self.key);
-				Err(LiveError::Load(fmtstruct::FmtError::NotFound))
-			}
-			LoadResult::Invalid(e) => {
-				#[cfg(feature = "logging")]
-				error!("Invalid config '{}': {}", self.key, e);
-				Err(LiveError::Load(e))
-			}
+			LoadResult::NotFound => Err(LiveError::Load(fmtstruct::FmtError::NotFound)),
+			LoadResult::Invalid(e) => Err(LiveError::Load(e)),
 		}
 	}
 
@@ -171,42 +162,25 @@ where
 		let meta = self.store.get_meta(&self.key).ok_or(LiveError::NotLoaded)?;
 		let watch_path = meta.source;
 
-		let target = Target::File(watch_path.clone());
+		let target = Target::File(watch_path);
 		let watcher = Watcher::new(target, config)?;
 
 		let mut rx = watcher.subscribe();
 		let store = self.store.clone();
 		let loader = self.loader.clone();
 		let key = self.key.clone();
-		#[cfg(feature = "logging")]
-		let log_path = watch_path.clone();
 
 		let handle = tokio::spawn(async move {
-			#[cfg(feature = "logging")]
-			info!("Started watching config '{}' at {:?}", key, log_path);
-
 			while let Ok(_event) = rx.recv().await {
-				match loader.load::<T>(&key).await {
-					LoadResult::Ok { value, info } => {
-						let source_path = tokio::fs::canonicalize(&info.path)
-							.await
-							.unwrap_or(info.path);
-						store.insert(key.clone(), value, source_path, UnloadPolicy::default());
-						#[cfg(feature = "logging")]
-						info!("Reloaded config '{}'", key);
-					}
-					LoadResult::NotFound => {
-						#[cfg(feature = "logging")]
-						warn!("Config '{}' not found during reload", key);
-					}
-					LoadResult::Invalid(e) => {
-						#[cfg(feature = "logging")]
-						error!("Failed to reload config '{}': {}", key, e);
-					}
+				if let LoadResult::Ok { value, info } = loader.load::<T>(&key).await {
+					let source_path = tokio::fs::canonicalize(&info.path)
+						.await
+						.unwrap_or(info.path);
+					store.insert(key.clone(), value, source_path, UnloadPolicy::default());
 				}
+				// NotFound and Invalid are silently ignored during watch.
+				// Use events feature to observe reload failures if needed.
 			}
-			#[cfg(feature = "logging")]
-			info!("Stopped watching config '{}'", key);
 		});
 
 		*self.task_handle.lock().await = Some(handle);
@@ -224,5 +198,20 @@ where
 		if let Some(handle) = lock.take() {
 			handle.abort();
 		}
+	}
+}
+
+impl<T> std::fmt::Debug for Live<T>
+where
+	T: std::fmt::Debug,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut s = f.debug_struct("Live");
+		s.field("store", &self.store);
+		s.field("loader", &self.loader);
+		s.field("key", &self.key);
+		#[cfg(feature = "signal")]
+		s.field("watcher", &self.watcher);
+		s.finish_non_exhaustive()
 	}
 }

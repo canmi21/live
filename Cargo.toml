@@ -1,7 +1,7 @@
 [package]
 name = "live"
 license = "MIT"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 rust-version = "1.93"
 categories = ["config", "asynchronous"]
@@ -17,11 +17,10 @@ fsig = { version = "0.2", default-features = false, optional = true }
 serde = { version = "1", optional = true }
 thiserror = { version = "2", optional = true }
 tokio = { version = "1", features = ["sync"], optional = true }
-log = { version = "0.4", optional = true }
 
 [features]
 default = []
-full = ["holder", "loader", "signal", "controller", "events", "fs", "json", "toml", "yaml", "validate", "match", "stream", "logging"]
+full = ["holder", "loader", "signal", "controller", "events", "fs", "json", "toml", "yaml", "validate", "match", "stream"]
 holder = ["dep:atomhold"]
 loader = ["dep:fmtstruct", "fmtstruct/std"]
 signal = ["dep:fsig"]
@@ -37,7 +36,6 @@ regex = ["loader", "fmtstruct/regex"]
 match = ["signal", "fsig/match"]
 stream = ["signal", "fsig/stream"]
 serde = ["fsig?/serde"]
-logging = ["fmtstruct?/logging", "dep:log"]
 
 [[example]]
 name = "basic"
