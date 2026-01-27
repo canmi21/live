@@ -1,4 +1,4 @@
-/* src/loader/loader/static_loader.rs */
+/* src/loader/impls/static_loader.rs */
 
 use super::super::{FmtError, Format, LoadInfo, LoadResult, PreProcess, Source, ValidateConfig};
 use serde::de::DeserializeOwned;

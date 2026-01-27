@@ -1,4 +1,4 @@
-/* src/loader/loader/mod.rs */
+/* src/loader/impls/mod.rs */
 
 mod static_loader;
 pub use static_loader::StaticLoader;

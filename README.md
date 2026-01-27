@@ -35,24 +35,10 @@ live = { version = "0.3", features = ["full"] }
 
 | Feature | Description |
 |---------|-------------|
-| **Core Modules** | |
 | `holder` | Enables the atomic storage module (`Store`). |
 | `loader` | Enables the configuration loading module (`DynLoader`, `StaticLoader`). |
 | `signal` | Enables the filesystem monitoring module (`Watcher`). |
 | `controller` | Enables the `Live` controller (requires `holder` + `loader`). |
-| **Formats** | |
-| `json` | Support for JSON format (via `serde_json`). |
-| `toml` | Support for TOML format (via `toml`). |
-| `yaml` | Support for YAML format (via `serde_yaml`). |
-| `postcard` | Support for Postcard format. |
-| **Extras** | |
-| `fs` | Enable `FileSource` for loading from the filesystem. |
-| `validate` | Enable validation support via `validator` crate. |
-| `events` | Enable event broadcasting for `Store`. |
-| `match` | Enable glob pattern matching for signals. |
-| `stream` | Enable `Stream` API for signals. |
-| `logging` | Enable logging integration. |
-| **Collections** | |
 | `full` | Enables all features above. |
 
 ## License

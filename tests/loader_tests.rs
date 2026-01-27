@@ -1,3 +1,5 @@
+/* tests/loader_tests.rs */
+
 #![cfg(all(feature = "loader", feature = "json", feature = "validate"))]
 
 use live::loader::{DynLoader, LoadResult, MemorySource, format::AnyFormat};

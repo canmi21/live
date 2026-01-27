@@ -1,4 +1,4 @@
-/* src/loader/loader/dyn_loader.rs */
+/* src/loader/impls/dyn_loader.rs */
 
 use super::super::{
 	FmtError, Format, LoadInfo, LoadResult, PreProcess, Source, ValidateConfig, format::AnyFormat,

@@ -4,7 +4,7 @@ license = "MIT"
 version = "0.3.1"
 edition = "2024"
 rust-version = "1.93"
-categories = ["asynchronous"]
+categories = ["config", "asynchronous"]
 description = "A modular configuration framework with live reloading and atomic, format-agnostic updates."
 keywords = ["config", "live-reload", "atomic", "async", "monitoring"]
 readme = "README.md"
@@ -32,27 +32,21 @@ validator = { version = "0.20", features = ["derive"], optional = true }
 [features]
 default = []
 full = ["events", "fs", "json", "toml", "yaml", "validate", "match", "stream", "logging", "controller"]
-
 holder = ["dep:arc-swap", "dep:thiserror"]
 loader = ["dep:async-trait", "dep:thiserror", "dep:serde"]
 signal = ["dep:notify", "dep:tracing", "dep:tokio", "dep:thiserror"]
 controller = ["holder", "loader"]
-
 events = ["holder", "dep:tokio"]
-
 fs = ["loader", "dep:tokio"]
 json = ["loader", "dep:serde_json"]
 toml = ["loader", "dep:toml"]
 yaml = ["loader", "dep:serde_yaml"]
 postcard = ["loader", "dep:postcard"]
-
 validate = ["loader", "dep:validator"]
 regex = ["validate", "dep:fancy-regex"]
-
 match = ["signal", "dep:globset"]
 stream = ["signal", "dep:futures-util", "dep:tokio-stream", "tokio-stream/sync"]
 serde = ["dep:serde"]
-
 logging = ["dep:log"]
 
 [[example]]
