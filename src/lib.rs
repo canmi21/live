@@ -8,3 +8,6 @@ pub mod loader;
 
 #[cfg(feature = "signal")]
 pub mod signal;
+
+#[cfg(all(feature = "holder", feature = "loader"))]
+pub mod controller;
