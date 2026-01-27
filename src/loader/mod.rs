@@ -12,12 +12,25 @@ pub use source::FileSource;
 
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
+use std::path::PathBuf;
+
+/// Metadata about the loaded configuration.
+#[derive(Debug, Clone)]
+pub struct LoadInfo {
+    /// The actual path or key of the loaded resource.
+    pub path: PathBuf,
+    /// The format used to parse the resource.
+    pub format: &'static str,
+}
 
 /// Result of a loading operation.
 #[derive(Debug)]
 pub enum LoadResult<T> {
     /// Successfully loaded and parsed.
-    Ok(T),
+    Ok {
+        value: T,
+        info: LoadInfo,
+    },
     /// Resource not found at the given key.
     NotFound,
     /// Resource exists but is invalid.

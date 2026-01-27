@@ -1,7 +1,8 @@
 use super::super::{
-    format::AnyFormat, FmtError, Format, LoadResult, PreProcess, Source, ValidateConfig,
+    format::AnyFormat, FmtError, Format, LoadInfo, LoadResult, PreProcess, Source, ValidateConfig,
 };
 use serde::de::DeserializeOwned;
+use std::path::PathBuf;
 
 pub struct DynLoader {
     source: Box<dyn Source>,
@@ -128,7 +129,7 @@ impl DynLoader {
         T: DeserializeOwned + PreProcess + validator::Validate,
     {
         match self.load::<T>(base_name).await {
-            LoadResult::Ok(_) => Ok(()),
+            LoadResult::Ok { .. } => Ok(()),
             LoadResult::Invalid(e) => Err(e),
             LoadResult::NotFound => Err(FmtError::NotFound),
         }
@@ -154,7 +155,15 @@ impl DynLoader {
                     return LoadResult::Invalid(e);
                 }
 
-                LoadResult::Ok(obj)
+                let format_name = format.extensions().first().copied().unwrap_or("unknown");
+
+                LoadResult::Ok {
+                    value: obj,
+                    info: LoadInfo {
+                        path: PathBuf::from(key),
+                        format: format_name,
+                    },
+                }
             }
             Err(e) => LoadResult::Invalid(e),
         }

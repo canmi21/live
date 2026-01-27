@@ -1,5 +1,6 @@
-use super::super::{FmtError, Format, LoadResult, PreProcess, Source, ValidateConfig};
+use super::super::{FmtError, Format, LoadInfo, LoadResult, PreProcess, Source, ValidateConfig};
 use serde::de::DeserializeOwned;
+use std::path::PathBuf;
 
 /// A zero-cost loader that combines a specific Source and Format at compile time.
 pub struct StaticLoader<S, F> {
@@ -37,7 +38,15 @@ where
                     return LoadResult::Invalid(e);
                 }
 
-                LoadResult::Ok(obj)
+                let format_name = self.format.extensions().first().copied().unwrap_or("unknown");
+
+                LoadResult::Ok {
+                    value: obj,
+                    info: LoadInfo {
+                        path: PathBuf::from(key),
+                        format: format_name,
+                    },
+                }
             }
             Err(e) => LoadResult::Invalid(e),
         }
