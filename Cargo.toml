@@ -12,14 +12,34 @@ repository = "https://github.com/canmi21/live.git"
 
 [dependencies]
 arc-swap = { version = "1", optional = true }
+async-trait = { version = "0.1.89", optional = true }
+fancy-regex = { version = "0.17.0", optional = true }
+log = { version = "0.4.29", optional = true }
+postcard = { version = "1.1.3", optional = true }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", optional = true }
+serde_yaml = { version = "0.9.34", optional = true }
 thiserror = { version = "2", optional = true }
-tokio = { version = "1", features = ["sync"], optional = true }
+tokio = { version = "1", features = ["sync", "fs", "io-util"], optional = true }
+toml = { version = "0.9.11", optional = true }
+validator = { version = "0.20.0", optional = true }
 
 [features]
-full = ["holder", "events"]
+full = ["holder", "events", "loader-full"]
 holder = ["dep:arc-swap", "dep:thiserror"]
 events = ["dep:tokio", "holder"]
-tokio = ["dep:tokio"]
+
+loader = ["dep:async-trait", "dep:thiserror"]
+loader-full = ["loader", "fs", "json", "toml", "yaml", "postcard", "validate", "logging"]
+
+fs = ["loader", "dep:tokio"]
+json = ["loader", "dep:serde_json"]
+toml = ["loader", "dep:toml"]
+yaml = ["loader", "dep:serde_yaml"]
+postcard = ["loader", "dep:postcard"]
+validate = ["loader", "dep:validator"]
+regex = ["validate", "dep:fancy-regex"]
+logging = ["dep:log"]
 
 #[[example]]
 #name = ""
