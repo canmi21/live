@@ -1,7 +1,7 @@
 [package]
 name = "live"
 license = "MIT"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 rust-version = "1.93"
 categories = ["config", "asynchronous"]
@@ -11,48 +11,40 @@ readme = "README.md"
 repository = "https://github.com/canmi21/live.git"
 
 [dependencies]
-arc-swap = { version = "1", optional = true }
-async-trait = { version = "0.1", optional = true }
-fancy-regex = { version = "0.17", optional = true }
-futures-util = { version = "0.3", optional = true }
-globset = { version = "0.4", optional = true }
-log = { version = "0.4", optional = true }
-notify = { version = "8", optional = true }
-postcard = { version = "1", optional = true }
-serde = { version = "1", features = ["derive"], optional = true }
-serde_json = { version = "1", optional = true }
-serde_yaml = { version = "0.9", optional = true }
+atomhold = { version = "0.2", optional = true }
+fmtstruct = { version = "0.2", default-features = false, optional = true }
+fsig = { version = "0.2", default-features = false, optional = true }
+serde = { version = "1", optional = true }
 thiserror = { version = "2", optional = true }
-tokio = { version = "1", features = ["sync", "fs", "io-util", "time", "rt", "macros", "rt-multi-thread"], optional = true }
-tokio-stream = { version = "0.1", optional = true }
-toml = { version = "0.9", optional = true }
-tracing = { version = "0.1", optional = true }
-validator = { version = "0.20", features = ["derive"], optional = true }
+tokio = { version = "1", features = ["sync"], optional = true }
+log = { version = "0.4", optional = true }
 
 [features]
 default = []
-full = ["events", "fs", "json", "toml", "yaml", "validate", "match", "stream", "logging", "controller"]
-holder = ["dep:arc-swap", "dep:thiserror"]
-loader = ["dep:async-trait", "dep:thiserror", "dep:serde"]
-signal = ["dep:notify", "dep:tracing", "dep:tokio", "dep:thiserror"]
-controller = ["holder", "loader"]
-events = ["holder", "dep:tokio"]
-fs = ["loader", "dep:tokio"]
-json = ["loader", "dep:serde_json"]
-toml = ["loader", "dep:toml"]
-yaml = ["loader", "dep:serde_yaml"]
-postcard = ["loader", "dep:postcard"]
-validate = ["loader", "dep:validator"]
-regex = ["validate", "dep:fancy-regex"]
-match = ["signal", "dep:globset"]
-stream = ["signal", "dep:futures-util", "dep:tokio-stream", "tokio-stream/sync"]
-serde = ["dep:serde"]
-logging = ["dep:log"]
+full = ["holder", "loader", "signal", "controller", "events", "fs", "json", "toml", "yaml", "validate", "match", "stream", "logging"]
+holder = ["dep:atomhold"]
+loader = ["dep:fmtstruct", "fmtstruct/std"]
+signal = ["dep:fsig"]
+controller = ["holder", "loader", "dep:serde", "dep:thiserror", "dep:tokio"]
+events = ["holder", "atomhold/events", "dep:tokio"]
+fs = ["loader", "fmtstruct/fs"]
+json = ["loader", "fmtstruct/json"]
+toml = ["loader", "fmtstruct/toml"]
+yaml = ["loader", "fmtstruct/yaml"]
+postcard = ["loader", "fmtstruct/postcard"]
+validate = ["loader", "fmtstruct/validate"]
+regex = ["loader", "fmtstruct/regex"]
+match = ["signal", "fsig/match"]
+stream = ["signal", "fsig/stream"]
+serde = ["fsig?/serde"]
+logging = ["fmtstruct?/logging", "dep:log"]
 
 [[example]]
 name = "basic"
 required-features = ["full"]
 
 [dev-dependencies]
+serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
+validator = { version = "0.20", features = ["derive"] }
