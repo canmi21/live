@@ -1,6 +1,10 @@
 use std::sync::Arc;
-
 use serde::de::DeserializeOwned;
+
+#[cfg(feature = "signal")]
+use tokio::sync::Mutex;
+#[cfg(feature = "signal")]
+use tokio::task::JoinHandle;
 
 use crate::holder::{Store, UnloadPolicy};
 use crate::loader::{DynLoader, LoadResult, PreProcess, ValidateConfig};
@@ -11,6 +15,9 @@ use crate::signal::{Config as WatcherConfig, Target, Watcher};
 #[cfg(feature = "logging")]
 use log::{error, info, warn};
 
+pub mod error;
+pub use error::LiveError;
+
 /// A controller for a live-reloading configuration value.
 pub struct Live<T> {
     store: Arc<Store<T>>,
@@ -18,6 +25,8 @@ pub struct Live<T> {
     key: String,
     #[cfg(feature = "signal")]
     watcher: Option<Arc<Watcher>>,
+    #[cfg(feature = "signal")]
+    task_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 /// Builder for Live controller.
@@ -54,10 +63,10 @@ where
         self
     }
 
-    pub fn build(self) -> Result<Live<T>, &'static str> {
-        let store = self.store.ok_or("store is required")?;
-        let loader = self.loader.ok_or("loader is required")?;
-        let key = self.key.ok_or("key is required")?;
+    pub fn build(self) -> Result<Live<T>, LiveError> {
+        let store = self.store.ok_or_else(|| LiveError::Builder("store is required".to_string()))?;
+        let loader = self.loader.ok_or_else(|| LiveError::Builder("loader is required".to_string()))?;
+        let key = self.key.ok_or_else(|| LiveError::Builder("key is required".to_string()))?;
         
         Ok(Live {
             store,
@@ -65,6 +74,8 @@ where
             key,
             #[cfg(feature = "signal")]
             watcher: None,
+            #[cfg(feature = "signal")]
+            task_handle: Arc::new(Mutex::new(None)),
         })
     }
 }
@@ -93,11 +104,13 @@ where
             key: key.into(),
             #[cfg(feature = "signal")]
             watcher: None,
+            #[cfg(feature = "signal")]
+            task_handle: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Performs an immediate load from the source.
-    pub async fn load(&self) -> Result<(), String> {
+    pub async fn load(&self) -> Result<(), LiveError> {
         match self.loader.load::<T>(&self.key).await {
             LoadResult::Ok { value, info } => {
                 #[cfg(feature = "logging")]
@@ -115,19 +128,19 @@ where
                 let msg = format!("Config not found: {}", self.key);
                 #[cfg(feature = "logging")]
                 warn!("{}", msg);
-                Err(msg)
+                Err(LiveError::Load(crate::loader::FmtError::NotFound))
             }
             LoadResult::Invalid(e) => {
                 let msg = format!("Invalid config: {}", e);
                 #[cfg(feature = "logging")]
                 error!("{}", msg);
-                Err(msg)
+                Err(LiveError::Load(e))
             }
         }
     }
     
     /// Manually reloads the configuration.
-    pub async fn reload(&self) -> Result<(), String> {
+    pub async fn reload(&self) -> Result<(), LiveError> {
         self.load().await
     }
 
@@ -135,22 +148,28 @@ where
         self.store.get(&self.key)
     }
 
+    #[cfg(feature = "events")]
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<crate::holder::HoldEvent<T>> {
+        self.store.subscribe()
+    }
+
     #[cfg(feature = "signal")]
-    pub fn watch(mut self, config: WatcherConfig) -> Result<Self, String> {
+    pub async fn watch(mut self, config: WatcherConfig) -> Result<Self, LiveError> {
         // Retrieve the source path from the store metadata.
-        let meta = self.store.get_meta(&self.key).ok_or("Config not loaded yet. Call load() before watch().")?;
+        let meta = self.store.get_meta(&self.key).ok_or(LiveError::NotLoaded)?;
         let watch_path = meta.source;
         
         let target = Target::File(watch_path.clone());
-        let watcher = Watcher::new(target, config).map_err(|e| e.to_string())?;
+        let watcher = Watcher::new(target, config)?;
         
         let mut rx = watcher.subscribe();
         let store = self.store.clone();
         let loader = self.loader.clone();
         let key = self.key.clone();
+        #[cfg(feature = "logging")]
         let _source_path = watch_path.clone();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             #[cfg(feature = "logging")]
             info!("Started watching config '{}' at {:?}", key, _source_path);
 
@@ -180,7 +199,19 @@ where
             info!("Stopped watching config '{}'", key);
         });
 
+        *self.task_handle.lock().await = Some(handle);
         self.watcher = Some(Arc::new(watcher));
         Ok(self)
+    }
+
+    #[cfg(feature = "signal")]
+    pub async fn stop_watching(&self) {
+        if let Some(watcher) = &self.watcher {
+            watcher.stop();
+        }
+        let mut lock = self.task_handle.lock().await;
+        if let Some(handle) = lock.take() {
+            handle.abort();
+        }
     }
 }

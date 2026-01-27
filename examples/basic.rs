@@ -44,14 +44,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let live = Live::new(store, loader, "example_config");
 
     // 4. Initial load
-    live.load().await.map_err(|e| e)?;
+    live.load().await?;
 
     if let Some(config) = live.get() {
         println!("Initial config: {:?}", config);
     }
 
     // 5. Start watching
-    let live = live.watch(WatcherConfig::default())?;
+    let live = live.watch(WatcherConfig::default()).await?;
 
     println!("Watching for changes on {}... (Edit the file to see updates)", config_path);
     println!("Waiting 20 seconds...");
