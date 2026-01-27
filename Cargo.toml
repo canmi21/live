@@ -1,5 +1,5 @@
 [package]
-name = ""
+name = "live"
 license = "MIT"
 version = "0.0.1"
 edition = "2024"
@@ -8,14 +8,18 @@ categories = ["asynchronous"]
 description = ""
 keywords = [""]
 readme = "README.md"
-repository = "https://github.com/canmi21/{repo}.git"
+repository = "https://github.com/canmi21/live.git"
 
 [dependencies]
+arc-swap = { version = "1", optional = true }
+thiserror = { version = "2", optional = true }
 
 [features]
+full = ["holder"]
+holder = ["dep:arc-swap", "dep:thiserror"]
 
-[[example]]
-name = ""
-required-features = [""]
+#[[example]]
+#name = ""
+#required-features = [""]
 
 [dev-dependencies]
