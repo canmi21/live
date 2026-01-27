@@ -75,7 +75,7 @@ impl CompiledTarget {
         }
 
         match self {
-            CompiledTarget::File(target_path) => path == target_path,
+            CompiledTarget::File(target_path) => relative_path == target_path,
             CompiledTarget::Directory(_) => true,
             CompiledTarget::Filtered {
                 #[cfg(feature = "signal-match")]

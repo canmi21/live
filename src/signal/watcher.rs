@@ -27,10 +27,15 @@ impl Watcher {
         let (watch_path, mode, root_path) = match &target {
             Target::File(p) => {
                 if let Some(parent) = p.parent() {
+                    let parent = if parent.as_os_str().is_empty() {
+                        std::path::PathBuf::from(".")
+                    } else {
+                        parent.to_path_buf()
+                    };
                     (
-                        parent.to_path_buf(),
+                        parent.clone(),
                         RecursiveMode::NonRecursive,
-                        parent.to_path_buf(),
+                        parent,
                     )
                 } else {
                     (p.clone(), RecursiveMode::NonRecursive, p.clone())
@@ -51,6 +56,9 @@ impl Watcher {
         let compiled_target = CompiledTarget::new(target)?;
 
         internal_watcher.watch(&watch_path, mode)?;
+
+        // Canonicalize root path to ensure strip_prefix works with absolute paths from notify
+        let root_path = std::fs::canonicalize(&root_path).unwrap_or(root_path);
 
         let (user_tx, _) = broadcast::channel(100);
         let tx_clone = user_tx.clone();
