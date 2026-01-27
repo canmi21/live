@@ -1,0 +1,21 @@
+[package]
+name = ""
+license = "MIT"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.93"
+categories = ["asynchronous"]
+description = ""
+keywords = [""]
+readme = "README.md"
+repository = "https://github.com/canmi21/{repo}.git"
+
+[dependencies]
+
+[features]
+
+[[example]]
+name = ""
+required-features = [""]
+
+[dev-dependencies]
