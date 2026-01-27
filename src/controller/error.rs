@@ -1,7 +1,7 @@
-/* src/controller/error.rs */
+//! Error types for the Live controller.
 
-use crate::holder::HoldError;
-use crate::loader::FmtError;
+use atomhold::HoldError;
+use fmtstruct::FmtError;
 use thiserror::Error;
 
 /// Errors that can occur in the Live controller.
@@ -15,11 +15,11 @@ pub enum LiveError {
 
 	#[cfg(feature = "signal")]
 	#[error("Signal error: {0}")]
-	Signal(#[from] crate::signal::SignalError),
+	Signal(#[from] fsig::Error),
 
 	#[error("Config not loaded yet. Call load() before watch().")]
 	NotLoaded,
 
-	#[error("Missing requirement: {0}")]
+	#[error("Builder error: {0}")]
 	Builder(String),
 }

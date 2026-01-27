@@ -1,22 +1,19 @@
-/* src/controller/mod.rs */
-
+//! The `Live` controller for live-reloading configuration.
 //!
-//! The `Live` struct is the main entry point for using this crate.
-//! It binds a `Store` to a `Loader` and optionally a `Watcher`.
+//! Binds a `Store` to a `Loader` and optionally a `Watcher`.
 
-use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
+use atomhold::{Store, UnloadPolicy};
+use fmtstruct::{DynLoader, LoadResult, PreProcess, ValidateConfig};
+use serde::de::DeserializeOwned;
+
+#[cfg(feature = "signal")]
+use fsig::{Config as WatcherConfig, Target, Watcher};
 #[cfg(feature = "signal")]
 use tokio::sync::Mutex;
 #[cfg(feature = "signal")]
 use tokio::task::JoinHandle;
-
-use crate::holder::{Store, UnloadPolicy};
-use crate::loader::{DynLoader, LoadResult, PreProcess, ValidateConfig};
-
-#[cfg(feature = "signal")]
-use crate::signal::{Config as WatcherConfig, Target, Watcher};
 
 #[cfg(feature = "logging")]
 use log::{error, info, warn};
@@ -125,24 +122,26 @@ where
 	pub async fn load(&self) -> Result<(), LiveError> {
 		match self.loader.load::<T>(&self.key).await {
 			LoadResult::Ok { value, info } => {
-				#[cfg(feature = "logging")]
-				info!("Loaded config '{}' from {:?}", self.key, info.path);
+				// Canonicalize the path for proper filesystem watching
+				let source_path = tokio::fs::canonicalize(&info.path)
+					.await
+					.unwrap_or(info.path);
 
-				self
-					.store
-					.insert(self.key.clone(), value, info.path, UnloadPolicy::default());
+				#[cfg(feature = "logging")]
+				info!("Loaded config '{}' from {:?}", self.key, source_path);
+
+				self.store
+					.insert(self.key.clone(), value, source_path, UnloadPolicy::default());
 				Ok(())
 			}
 			LoadResult::NotFound => {
-				let msg = format!("Config not found: {}", self.key);
 				#[cfg(feature = "logging")]
-				warn!("{}", msg);
-				Err(LiveError::Load(crate::loader::FmtError::NotFound))
+				warn!("Config not found: {}", self.key);
+				Err(LiveError::Load(fmtstruct::FmtError::NotFound))
 			}
 			LoadResult::Invalid(e) => {
-				let msg = format!("Invalid config: {}", e);
 				#[cfg(feature = "logging")]
-				error!("{}", msg);
+				error!("Invalid config '{}': {}", self.key, e);
 				Err(LiveError::Load(e))
 			}
 		}
@@ -153,18 +152,22 @@ where
 		self.load().await
 	}
 
+	/// Returns the current configuration value.
 	pub fn get(&self) -> Option<Arc<T>> {
 		self.store.get(&self.key)
 	}
 
+	/// Subscribes to store change events.
 	#[cfg(feature = "events")]
-	pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<crate::holder::HoldEvent<T>> {
+	pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<atomhold::HoldEvent<T>> {
 		self.store.subscribe()
 	}
 
+	/// Attaches a filesystem watcher for live reloading.
+	///
+	/// Must call `load()` before `watch()` to establish the source path.
 	#[cfg(feature = "signal")]
 	pub async fn watch(mut self, config: WatcherConfig) -> Result<Self, LiveError> {
-		// Retrieve the source path from the store metadata.
 		let meta = self.store.get_meta(&self.key).ok_or(LiveError::NotLoaded)?;
 		let watch_path = meta.source;
 
@@ -176,16 +179,19 @@ where
 		let loader = self.loader.clone();
 		let key = self.key.clone();
 		#[cfg(feature = "logging")]
-		let _source_path = watch_path.clone();
+		let log_path = watch_path.clone();
 
 		let handle = tokio::spawn(async move {
 			#[cfg(feature = "logging")]
-			info!("Started watching config '{}' at {:?}", key, _source_path);
+			info!("Started watching config '{}' at {:?}", key, log_path);
 
 			while let Ok(_event) = rx.recv().await {
 				match loader.load::<T>(&key).await {
 					LoadResult::Ok { value, info } => {
-						store.insert(key.clone(), value, info.path, UnloadPolicy::default());
+						let source_path = tokio::fs::canonicalize(&info.path)
+							.await
+							.unwrap_or(info.path);
+						store.insert(key.clone(), value, source_path, UnloadPolicy::default());
 						#[cfg(feature = "logging")]
 						info!("Reloaded config '{}'", key);
 					}
@@ -208,6 +214,7 @@ where
 		Ok(self)
 	}
 
+	/// Stops the filesystem watcher.
 	#[cfg(feature = "signal")]
 	pub async fn stop_watching(&self) {
 		if let Some(watcher) = &self.watcher {
