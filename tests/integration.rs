@@ -1,4 +1,4 @@
-/* tests/integration.rs */
+#![cfg(feature = "full")]
 
 use live::controller::Live;
 use live::holder::Store;
