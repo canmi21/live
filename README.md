@@ -31,14 +31,23 @@ live = { version = "0.3", features = ["full"] }
 
 ## Feature Flags
 
-`live` is highly modular. You can enable only the features you need.
-
 | Feature | Description |
 |---------|-------------|
-| `holder` | Enables the atomic storage module (`Store`). |
-| `loader` | Enables the configuration loading module (`DynLoader`, `StaticLoader`). |
-| `signal` | Enables the filesystem monitoring module (`Watcher`). |
+| `holder` | Enables the atomic storage module (re-exports `atomhold`). |
+| `loader` | Enables the configuration loading module (re-exports `fmtstruct`). |
+| `signal` | Enables the filesystem monitoring module (re-exports `fsig`). |
 | `controller` | Enables the `Live` controller (requires `holder` + `loader`). |
+| `events` | Enables event broadcasting for `Store`. |
+| `fs` | Enables `FileSource` for loading from filesystem. |
+| `json` | Enables JSON format support. |
+| `toml` | Enables TOML format support. |
+| `yaml` | Enables YAML format support. |
+| `postcard` | Enables Postcard (binary) format support. |
+| `validate` | Enables `validator` integration. |
+| `regex` | Enables regex validation (requires `validate`). |
+| `match` | Enables glob pattern matching for `Watcher`. |
+| `stream` | Enables `Stream` API for `Watcher`. |
+| `logging` | Enables logging via `log` crate. |
 | `full` | Enables all features above. |
 
 ## License
