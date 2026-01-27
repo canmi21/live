@@ -1,9 +1,11 @@
 use std::time::Duration;
+use std::fs;
+use std::sync::Arc;
 use serde::Deserialize;
 use validator::Validate;
 use live::controller::Live;
 use live::holder::Store;
-use live::loader::{DynLoader, MemorySource, format::AnyFormat, PreProcess};
+use live::loader::{DynLoader, FileSource, format::AnyFormat, PreProcess};
 use live::signal::Config as WatcherConfig;
 
 #[derive(Debug, Clone, Deserialize, Validate)]
@@ -17,14 +19,20 @@ impl PreProcess for AppConfig {}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 0. Prepare a real file
+    let config_path = "example_config.json";
+    // Ensure we start fresh
+    if std::path::Path::new(config_path).exists() {
+        fs::remove_file(config_path)?;
+    }
+    fs::write(config_path, b"{\"name\": \"live-demo\", \"port\": 8080}")?;
+    println!("Created {}", config_path);
+
     // 1. Setup Store
-    let store = std::sync::Arc::new(Store::<AppConfig>::new());
+    let store = Arc::new(Store::<AppConfig>::new());
 
-    // 2. Setup Loader with an In-Memory source for this example
-    // In real usage, you'd use FileSource.
-    let mut source = MemorySource::new();
-    source.insert("app.json", b"{\"name\": \"live-demo\", \"port\": 8080}".to_vec());
-
+    // 2. Setup Loader with FileSource
+    let source = FileSource::new("."); // Root is current dir
     let loader = DynLoader::builder()
         .source(source)
         .format(AnyFormat::Json)
@@ -32,8 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     // 3. Create Live Controller
-    // We use "app" as base name, DynLoader will find "app.json"
-    let live = Live::new(store, loader, "app");
+    // Base name "example_config". DynLoader will find "example_config.json"
+    let live = Live::new(store, loader, "example_config");
 
     // 4. Initial load
     live.load().await.map_err(|e| e)?;
@@ -42,18 +50,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Initial config: {:?}", config);
     }
 
-    // 5. Start watching (using a dummy path for memory source demonstration)
-    // In real life: live.watch(WatcherConfig::default(), Some(PathBuf::from("app.json")))?;
-    let live = live.watch(WatcherConfig::default(), None)?;
+    // 5. Start watching
+    let live = live.watch(WatcherConfig::default())?;
 
-    println!("Watching for changes... (Press Ctrl+C to stop)");
+    println!("Watching for changes on {}... (Edit the file to see updates)", config_path);
+    println!("Waiting 20 seconds...");
     
-    // Simulate some wait
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    
-    if let Some(config) = live.get() {
-        println!("Current config: {:?}", config);
+    // Loop to display config
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        if let Some(config) = live.get() {
+            println!("Current config: {:?}", config);
+        }
     }
-
+    
+    // Cleanup
+    fs::remove_file(config_path)?;
+    println!("Done.");
     Ok(())
 }
