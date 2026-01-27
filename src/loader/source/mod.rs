@@ -1,3 +1,5 @@
+/* src/loader/source/mod.rs */
+
 mod memory;
 pub use memory::MemorySource;
 

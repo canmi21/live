@@ -1,3 +1,5 @@
+/* src/loader/format/yaml.rs */
+
 use super::super::{FmtError, Format};
 use serde::de::DeserializeOwned;
 
@@ -5,11 +7,11 @@ use serde::de::DeserializeOwned;
 pub struct Yaml;
 
 impl Format for Yaml {
-    fn extensions(&self) -> &'static [&'static str] {
-        &["yaml", "yml"]
-    }
+	fn extensions(&self) -> &'static [&'static str] {
+		&["yaml", "yml"]
+	}
 
-    fn parse<T: DeserializeOwned>(&self, input: &[u8]) -> Result<T, FmtError> {
-        serde_yaml::from_slice(input).map_err(|e| FmtError::ParseError(e.to_string()))
-    }
+	fn parse<T: DeserializeOwned>(&self, input: &[u8]) -> Result<T, FmtError> {
+		serde_yaml::from_slice(input).map_err(|e| FmtError::ParseError(e.to_string()))
+	}
 }

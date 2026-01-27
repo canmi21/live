@@ -1,3 +1,5 @@
+/* src/loader/loader/mod.rs */
+
 mod static_loader;
 pub use static_loader::StaticLoader;
 

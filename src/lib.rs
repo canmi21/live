@@ -30,5 +30,5 @@ pub mod loader;
 #[cfg(feature = "signal")]
 pub mod signal;
 
-#[cfg(all(feature = "controller"))]
+#[cfg(feature = "controller")]
 pub mod controller;
