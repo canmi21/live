@@ -43,6 +43,9 @@ pub enum KeyPattern {
 
 	/// Try known extensions in order, strip first match. Falls back to Identity.
 	///
+	/// **Important**: Extensions are matched in order. Place longer/more specific
+	/// extensions first (e.g., `.config.json` before `.json`).
+	///
 	/// Useful for compound extensions like `.tar.gz` or `.config.json`.
 	///
 	/// Example:
