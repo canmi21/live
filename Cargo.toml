@@ -16,7 +16,7 @@ fmtstruct = { version = "0.2", default-features = false, optional = true }
 fsig = { version = "0.2", default-features = false, optional = true }
 serde = { version = "1", optional = true }
 thiserror = { version = "2", optional = true }
-tokio = { version = "1", features = ["sync"], optional = true }
+tokio = { version = "1", optional = true }
 
 [features]
 default = []
@@ -24,8 +24,8 @@ full = ["holder", "loader", "signal", "controller", "events", "fs", "json", "tom
 holder = ["dep:atomhold"]
 loader = ["dep:fmtstruct", "fmtstruct/std"]
 signal = ["dep:fsig"]
-controller = ["holder", "loader", "dep:serde", "dep:thiserror", "dep:tokio"]
-events = ["holder", "atomhold/events", "dep:tokio"]
+controller = ["holder", "loader", "fs", "dep:serde", "dep:thiserror", "dep:tokio", "tokio/sync", "tokio/fs"]
+events = ["holder", "atomhold/events", "dep:tokio", "tokio/sync"]
 fs = ["loader", "fmtstruct/fs"]
 json = ["loader", "fmtstruct/json"]
 toml = ["loader", "fmtstruct/toml"]
@@ -39,6 +39,10 @@ serde = ["fsig?/serde"]
 
 [[example]]
 name = "basic"
+required-features = ["full"]
+
+[[example]]
+name = "live_dir"
 required-features = ["full"]
 
 [dev-dependencies]
