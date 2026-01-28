@@ -13,6 +13,9 @@ pub enum LiveError {
 	#[error("Store error: {0}")]
 	Store(#[from] HoldError),
 
+	#[error("IO error: {0}")]
+	Io(#[from] std::io::Error),
+
 	#[cfg(feature = "signal")]
 	#[error("Signal error: {0}")]
 	Signal(#[from] fsig::Error),
