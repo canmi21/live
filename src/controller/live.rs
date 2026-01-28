@@ -199,14 +199,19 @@ where
 
 		let handle = tokio::spawn(async move {
 			while let Ok(_event) = rx.recv().await {
-				if let LoadResult::Ok { value, info } = loader.load::<T>(&key).await {
-					let source_path = tokio::fs::canonicalize(&info.path)
-						.await
-						.unwrap_or(info.path);
-					store.insert(key.clone(), value, source_path, UnloadPolicy::default());
+				match loader.load::<T>(&key).await {
+					LoadResult::Ok { value, info } => {
+						let source_path = tokio::fs::canonicalize(&info.path)
+							.await
+							.unwrap_or(info.path);
+						store.insert(key.clone(), value, source_path, UnloadPolicy::default());
+					}
+					LoadResult::Invalid(_) | LoadResult::NotFound => {
+						// Keep existing value if available.
+						// Invalid/NotFound during watch are silently ignored.
+						// Use events feature to observe reload failures if needed.
+					}
 				}
-				// NotFound and Invalid are silently ignored during watch.
-				// Use events feature to observe reload failures if needed.
 			}
 		});
 
