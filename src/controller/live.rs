@@ -16,15 +16,19 @@ use tokio::task::AbortHandle;
 
 use super::LiveError;
 
+#[cfg(feature = "signal")]
+struct WatchState {
+	watcher: Watcher,
+	abort_handle: AbortHandle,
+}
+
 /// A controller for a live-reloading configuration value.
 pub struct Live<T> {
 	store: Arc<Store<T>>,
 	loader: Arc<DynLoader>,
 	key: String,
 	#[cfg(feature = "signal")]
-	watcher: Option<Arc<Watcher>>,
-	#[cfg(feature = "signal")]
-	abort_handle: Option<AbortHandle>,
+	watch_state: Option<Arc<WatchState>>,
 }
 
 impl<T> Clone for Live<T> {
@@ -34,9 +38,7 @@ impl<T> Clone for Live<T> {
 			loader: self.loader.clone(),
 			key: self.key.clone(),
 			#[cfg(feature = "signal")]
-			watcher: self.watcher.clone(),
-			#[cfg(feature = "signal")]
-			abort_handle: self.abort_handle.clone(),
+			watch_state: self.watch_state.clone(),
 		}
 	}
 }
@@ -44,11 +46,11 @@ impl<T> Clone for Live<T> {
 #[cfg(feature = "signal")]
 impl<T> Drop for Live<T> {
 	fn drop(&mut self) {
-		if let Some(watcher) = self.watcher.take() {
-			watcher.stop();
-		}
-		if let Some(handle) = self.abort_handle.take() {
-			handle.abort();
+		if let Some(state) = self.watch_state.take()
+			&& let Ok(state) = Arc::try_unwrap(state)
+		{
+			state.watcher.stop();
+			state.abort_handle.abort();
 		}
 	}
 }
@@ -103,9 +105,7 @@ where
 			loader,
 			key,
 			#[cfg(feature = "signal")]
-			watcher: None,
-			#[cfg(feature = "signal")]
-			abort_handle: None,
+			watch_state: None,
 		})
 	}
 }
@@ -133,9 +133,7 @@ where
 			loader: Arc::new(loader),
 			key: key.into(),
 			#[cfg(feature = "signal")]
-			watcher: None,
-			#[cfg(feature = "signal")]
-			abort_handle: None,
+			watch_state: None,
 		}
 	}
 
@@ -205,8 +203,10 @@ where
 			}
 		});
 
-		self.abort_handle = Some(handle.abort_handle());
-		self.watcher = Some(Arc::new(watcher));
+		self.watch_state = Some(Arc::new(WatchState {
+			watcher,
+			abort_handle: handle.abort_handle(),
+		}));
 		Ok(())
 	}
 
@@ -222,18 +222,18 @@ where
 	/// Stops the filesystem watcher.
 	#[cfg(feature = "signal")]
 	pub fn stop_watching(&mut self) {
-		if let Some(watcher) = self.watcher.take() {
-			watcher.stop();
-		}
-		if let Some(handle) = self.abort_handle.take() {
-			handle.abort();
+		if let Some(state) = self.watch_state.take()
+			&& let Ok(state) = Arc::try_unwrap(state)
+		{
+			state.watcher.stop();
+			state.abort_handle.abort();
 		}
 	}
 
 	/// Returns true if the watcher is currently active.
 	#[cfg(feature = "signal")]
 	pub fn is_watching(&self) -> bool {
-		self.watcher.is_some()
+		self.watch_state.is_some()
 	}
 }
 
@@ -247,7 +247,7 @@ where
 		s.field("loader", &self.loader);
 		s.field("key", &self.key);
 		#[cfg(feature = "signal")]
-		s.field("watcher", &self.watcher.is_some());
+		s.field("watching", &self.watch_state.is_some());
 		s.finish_non_exhaustive()
 	}
 }
