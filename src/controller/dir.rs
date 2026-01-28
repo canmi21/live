@@ -21,6 +21,12 @@ use tokio::task::AbortHandle;
 use super::LiveError;
 use super::pattern::{KeyPattern, ScanMode, ScanResult};
 
+#[cfg(feature = "signal")]
+struct WatchState {
+	watcher: Watcher,
+	abort_handle: AbortHandle,
+}
+
 /// A controller for live-reloading a directory of configurations.
 pub struct LiveDir<T> {
 	store: Arc<Store<T>>,
@@ -33,9 +39,7 @@ pub struct LiveDir<T> {
 	/// Keys owned by this LiveDir instance (prevents cross-deletion with shared Store).
 	owned_keys: Arc<RwLock<HashSet<String>>>,
 	#[cfg(feature = "signal")]
-	watcher: Option<Arc<Watcher>>,
-	#[cfg(feature = "signal")]
-	abort_handle: Option<AbortHandle>,
+	watch_state: Option<Arc<WatchState>>,
 }
 
 impl<T> Clone for LiveDir<T> {
@@ -50,9 +54,7 @@ impl<T> Clone for LiveDir<T> {
 			max_entries: self.max_entries,
 			owned_keys: self.owned_keys.clone(),
 			#[cfg(feature = "signal")]
-			watcher: self.watcher.clone(),
-			#[cfg(feature = "signal")]
-			abort_handle: self.abort_handle.clone(),
+			watch_state: self.watch_state.clone(),
 		}
 	}
 }
@@ -60,11 +62,11 @@ impl<T> Clone for LiveDir<T> {
 #[cfg(feature = "signal")]
 impl<T> Drop for LiveDir<T> {
 	fn drop(&mut self) {
-		if let Some(watcher) = self.watcher.take() {
-			watcher.stop();
-		}
-		if let Some(handle) = self.abort_handle.take() {
-			handle.abort();
+		if let Some(state) = self.watch_state.take()
+			&& let Ok(state) = Arc::try_unwrap(state)
+		{
+			state.watcher.stop();
+			state.abort_handle.abort();
 		}
 	}
 }
@@ -154,9 +156,7 @@ where
 			max_entries: self.max_entries,
 			owned_keys: Arc::new(RwLock::new(HashSet::new())),
 			#[cfg(feature = "signal")]
-			watcher: None,
-			#[cfg(feature = "signal")]
-			abort_handle: None,
+			watch_state: None,
 		})
 	}
 }
@@ -186,9 +186,7 @@ where
 			max_entries: None,
 			owned_keys: Arc::new(RwLock::new(HashSet::new())),
 			#[cfg(feature = "signal")]
-			watcher: None,
-			#[cfg(feature = "signal")]
-			abort_handle: None,
+			watch_state: None,
 		}
 	}
 
@@ -269,6 +267,7 @@ where
 		let handle = tokio::spawn(async move {
 			while let Ok(_event) = rx.recv().await {
 				// On any change, rescan the entire directory
+
 				let _ = Self::do_scan(
 					&store,
 					&loader,
@@ -280,13 +279,17 @@ where
 					&owned_keys,
 				)
 				.await;
+
 				// Errors during watch are silently ignored.
+
 				// Use events feature to observe failures if needed.
 			}
 		});
 
-		self.abort_handle = Some(handle.abort_handle());
-		self.watcher = Some(Arc::new(watcher));
+		self.watch_state = Some(Arc::new(WatchState {
+			watcher,
+			abort_handle: handle.abort_handle(),
+		}));
 		Ok(())
 	}
 
@@ -302,18 +305,18 @@ where
 	/// Stops the filesystem watcher.
 	#[cfg(feature = "signal")]
 	pub fn stop_watching(&mut self) {
-		if let Some(watcher) = self.watcher.take() {
-			watcher.stop();
-		}
-		if let Some(handle) = self.abort_handle.take() {
-			handle.abort();
+		if let Some(state) = self.watch_state.take()
+			&& let Ok(state) = Arc::try_unwrap(state)
+		{
+			state.watcher.stop();
+			state.abort_handle.abort();
 		}
 	}
 
 	/// Returns true if the watcher is currently active.
 	#[cfg(feature = "signal")]
 	pub fn is_watching(&self) -> bool {
-		self.watcher.is_some()
+		self.watch_state.is_some()
 	}
 
 	/// Internal: Scan the directory and sync with store.
@@ -473,7 +476,7 @@ where
 		s.field("policy", &self.policy);
 		s.field("max_entries", &self.max_entries);
 		#[cfg(feature = "signal")]
-		s.field("watcher", &self.watcher.is_some());
+		s.field("watching", &self.watch_state.is_some());
 		s.finish_non_exhaustive()
 	}
 }
