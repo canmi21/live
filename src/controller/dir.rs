@@ -28,6 +28,13 @@ struct WatchState {
 }
 
 /// A controller for live-reloading a directory of configurations.
+///
+/// # Clone Semantics
+///
+/// `LiveDir` supports efficient cloning. Cloned instances share the same underlying
+/// store, loader, and filesystem watcher (if active). The watcher will only be
+/// stopped and the background task aborted when the last remaining instance is dropped
+/// or when `stop_watching` is called on the last instance holding the active watcher.
 pub struct LiveDir<T> {
 	store: Arc<Store<T>>,
 	loader: Arc<DynLoader>,

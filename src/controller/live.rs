@@ -23,6 +23,13 @@ struct WatchState {
 }
 
 /// A controller for a live-reloading configuration value.
+///
+/// # Clone Semantics
+///
+/// `Live` supports efficient cloning. Cloned instances share the same underlying
+/// store, loader, and filesystem watcher (if active). The watcher will only be
+/// stopped and the background task aborted when the last remaining instance is dropped
+/// or when `stop_watching` is called on the last instance holding the active watcher.
 pub struct Live<T> {
 	store: Arc<Store<T>>,
 	loader: Arc<DynLoader>,

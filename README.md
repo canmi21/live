@@ -10,12 +10,13 @@ A modular configuration framework with live reloading, atomic updates, and forma
 - **Live Reloading**: Built-in filesystem monitoring (`Watcher`) that automatically detects changes and triggers reloads.
 - **Format Agnostic**: Support for multiple formats (`JSON`, `TOML`, `YAML`, `Postcard`) with automatic detection and extension.
 - **Secure Loading**: `FileSource` with sandbox protection against path traversal attacks.
-- **Unified Controller**: The `Live<T>` controller ties everything together, providing a simple API for loading, accessing, and watching configurations.
-- **Directory Scanning**: The `LiveDir<T>` controller manages multiple configurations from a directory, with pattern-based key extraction (e.g., `[443]` → `"443"`) and automatic sync on file changes.
+- **Unified Controller**: The `Live<T>` controller ties everything together, providing a simple API for loading, accessing, and watching configurations. Controllers are **thread-safe and cloneable**, sharing resources efficiently.
+- **Directory Scanning**: The `LiveDir<T>` controller manages multiple configurations from a directory, with pattern-based key extraction (e.g., `[443]` → `"443"`) and support for compound extensions (e.g., `.config.json`).
 - **Lifecycle Management**:
   - **Validation**: Integration with `validator` to ensure config validity before update.
   - **Preprocessing**: Hooks for data normalization or context injection.
   - **Debouncing**: Intelligent event coalescing to prevent redundant reloads.
+  - **Safe Cleanup**: Automatic and shared resource management; watchers are only stopped when the last controller instance is dropped.
 
 ## Usage Examples
 
