@@ -11,6 +11,7 @@ A modular configuration framework with live reloading, atomic updates, and forma
 - **Format Agnostic**: Support for multiple formats (`JSON`, `TOML`, `YAML`, `Postcard`) with automatic detection and extension.
 - **Secure Loading**: `FileSource` with sandbox protection against path traversal attacks.
 - **Unified Controller**: The `Live<T>` controller ties everything together, providing a simple API for loading, accessing, and watching configurations.
+- **Directory Scanning**: The `LiveDir<T>` controller manages multiple configurations from a directory, with pattern-based key extraction (e.g., `[443]` → `"443"`) and automatic sync on file changes.
 - **Lifecycle Management**:
   - **Validation**: Integration with `validator` to ensure config validity before update.
   - **Preprocessing**: Hooks for data normalization or context injection.
@@ -21,6 +22,7 @@ A modular configuration framework with live reloading, atomic updates, and forma
 Check the `examples` directory for runnable code:
 
 - **Basic Usage**: [`examples/basic.rs`](examples/basic.rs) - Demonstrates how to setup a `Live` controller, load a configuration, and watch for file changes.
+- **Directory Scanning**: [`examples/live_dir.rs`](examples/live_dir.rs) - Demonstrates `LiveDir` for managing multiple configurations from a directory with pattern-based key extraction.
 
 ## Installation
 
@@ -36,7 +38,7 @@ live = { version = "0.3", features = ["full"] }
 | `holder` | Enables the atomic storage module (re-exports `atomhold`). |
 | `loader` | Enables the configuration loading module (re-exports `fmtstruct`). |
 | `signal` | Enables the filesystem monitoring module (re-exports `fsig`). |
-| `controller` | Enables the `Live` controller (requires `holder` + `loader`). |
+| `controller` | Enables the `Live` and `LiveDir` controllers (requires `holder` + `loader` + `fs`). |
 | `events` | Enables event broadcasting for `Store`. |
 | `fs` | Enables `FileSource` for loading from filesystem. |
 | `json` | Enables JSON format support. |
