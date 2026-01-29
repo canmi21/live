@@ -178,6 +178,9 @@ where
 		match self.loader.load::<T>(&self.key).await {
 			LoadResult::Ok { mut value, info } => {
 				value.set_context(&self.key);
+				if let Err(e) = value.validate_config() {
+					return Err(LiveError::Load(e));
+				}
 				let source_path = tokio::fs::canonicalize(&info.path)
 					.await
 					.unwrap_or(info.path);
@@ -233,6 +236,12 @@ where
 				match loader.load::<T>(&key).await {
 					LoadResult::Ok { mut value, info } => {
 						value.set_context(&key);
+						if let Err(e) = value.validate_config() {
+							if let Some(ref cb) = on_error {
+								cb(LiveError::Load(e));
+							}
+							continue;
+						}
 						let source_path = tokio::fs::canonicalize(&info.path)
 							.await
 							.unwrap_or(info.path);
