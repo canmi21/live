@@ -435,7 +435,8 @@ where
 			};
 
 			match load_result {
-				LoadResult::Ok { value, info } => {
+				LoadResult::Ok { mut value, info } => {
+					value.set_context(key);
 					let source_path = fs::canonicalize(&info.path).await.unwrap_or(info.path);
 					store.insert(key.clone(), value, source_path, policy);
 					fs_keys.insert(key.clone());
