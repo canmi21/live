@@ -1,3 +1,5 @@
+/* tests/format_agnostic_subdirs.rs */
+
 #![cfg(feature = "full")]
 
 use live::controller::{KeyPattern, LiveDir, ScanMode};
