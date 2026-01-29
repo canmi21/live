@@ -437,6 +437,14 @@ where
 			match load_result {
 				LoadResult::Ok { mut value, info } => {
 					value.set_context(key);
+					if let Err(e) = value.validate_config() {
+						// Validation failed - keep old value if available
+						if store.get(key).is_some() {
+							fs_keys.insert(key.clone());
+						}
+						result.failed.push((key.clone(), e.to_string()));
+						continue;
+					}
 					let source_path = fs::canonicalize(&info.path).await.unwrap_or(info.path);
 					store.insert(key.clone(), value, source_path, policy);
 					fs_keys.insert(key.clone());
