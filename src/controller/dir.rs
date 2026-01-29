@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use atomhold::{Store, UnloadPolicy};
-use fmtstruct::{DynLoader, LoadResult, PreProcess, ValidateConfig};
+use fmtstruct::{DynLoader, FmtError, LoadResult, PreProcess, ValidateConfig};
 use serde::de::DeserializeOwned;
 use tokio::fs;
 use tokio::sync::RwLock;
@@ -303,7 +303,7 @@ where
 			while let Ok(_event) = rx.recv().await {
 				// On any change, rescan the entire directory
 
-				if let Err(e) = Self::do_scan(
+				match Self::do_scan(
 					&store,
 					&loader,
 					&path,
@@ -313,9 +313,21 @@ where
 					max_entries,
 					&owned_keys,
 				)
-				.await && let Some(ref cb) = on_error
+				.await
 				{
-					cb(e);
+					Ok(result) => {
+						if let Some(ref cb) = on_error {
+							for (key, err) in result.failed {
+								let msg = format!("[{}] {}", key, err);
+								cb(LiveError::Load(FmtError::ParseError(msg)));
+							}
+						}
+					}
+					Err(e) => {
+						if let Some(ref cb) = on_error {
+							cb(e);
+						}
+					}
 				}
 
 				// Errors during watch are silently ignored (except via callback).
