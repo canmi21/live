@@ -176,7 +176,8 @@ where
 	/// Performs an immediate load from the source.
 	pub async fn load(&self) -> Result<(), LiveError> {
 		match self.loader.load::<T>(&self.key).await {
-			LoadResult::Ok { value, info } => {
+			LoadResult::Ok { mut value, info } => {
+				value.set_context(&self.key);
 				let source_path = tokio::fs::canonicalize(&info.path)
 					.await
 					.unwrap_or(info.path);
@@ -230,7 +231,8 @@ where
 		let handle = tokio::spawn(async move {
 			while let Ok(_event) = rx.recv().await {
 				match loader.load::<T>(&key).await {
-					LoadResult::Ok { value, info } => {
+					LoadResult::Ok { mut value, info } => {
+						value.set_context(&key);
 						let source_path = tokio::fs::canonicalize(&info.path)
 							.await
 							.unwrap_or(info.path);
