@@ -148,7 +148,7 @@ async fn test_live_dir_subdirs_mode() -> Result<(), Box<dyn std::error::Error>> 
 		.path(dir_path)
 		.pattern(KeyPattern::Bracketed)
 		.scan_mode(ScanMode::Subdirs {
-			config_file: "config.json".to_string(),
+			config_file: "config".to_string(),
 		})
 		.build()?;
 

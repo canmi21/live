@@ -23,6 +23,9 @@ pub enum LiveError {
 	#[error("Config not loaded yet. Call load() before watch().")]
 	NotLoaded,
 
+	#[error("Entry limit exceeded: {0}")]
+	LimitExceeded(String),
+
 	#[error("Builder error: {0}")]
 	Builder(String),
 }

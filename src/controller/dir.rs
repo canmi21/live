@@ -15,17 +15,11 @@ use tokio::sync::RwLock;
 
 #[cfg(feature = "signal")]
 use fsig::{Config as WatcherConfig, Target, Watcher};
-#[cfg(feature = "signal")]
-use tokio::task::AbortHandle;
 
 use super::LiveError;
-use super::pattern::{KeyPattern, ScanMode, ScanResult};
-
 #[cfg(feature = "signal")]
-struct WatchState {
-	watcher: Watcher,
-	abort_handle: AbortHandle,
-}
+use super::WatchState;
+use super::pattern::{KeyPattern, ScanMode, ScanResult};
 
 /// A controller for live-reloading a directory of configurations.
 ///
@@ -45,6 +39,7 @@ pub struct LiveDir<T> {
 	max_entries: Option<usize>,
 	/// Keys owned by this LiveDir instance (prevents cross-deletion with shared Store).
 	owned_keys: Arc<RwLock<HashSet<String>>>,
+	on_error: Option<Arc<dyn Fn(LiveError) + Send + Sync>>,
 	#[cfg(feature = "signal")]
 	watch_state: Option<Arc<WatchState>>,
 }
@@ -60,6 +55,7 @@ impl<T> Clone for LiveDir<T> {
 			policy: self.policy,
 			max_entries: self.max_entries,
 			owned_keys: self.owned_keys.clone(),
+			on_error: self.on_error.clone(),
 			#[cfg(feature = "signal")]
 			watch_state: self.watch_state.clone(),
 		}
@@ -69,12 +65,7 @@ impl<T> Clone for LiveDir<T> {
 #[cfg(feature = "signal")]
 impl<T> Drop for LiveDir<T> {
 	fn drop(&mut self) {
-		if let Some(state) = self.watch_state.take()
-			&& let Ok(state) = Arc::try_unwrap(state)
-		{
-			state.watcher.stop();
-			state.abort_handle.abort();
-		}
+		self.stop_watching();
 	}
 }
 
@@ -87,6 +78,7 @@ pub struct LiveDirBuilder<T> {
 	scan_mode: ScanMode,
 	policy: UnloadPolicy,
 	max_entries: Option<usize>,
+	on_error: Option<Arc<dyn Fn(LiveError) + Send + Sync>>,
 }
 
 impl<T> LiveDirBuilder<T>
@@ -102,6 +94,7 @@ where
 			scan_mode: ScanMode::default(),
 			policy: UnloadPolicy::default(),
 			max_entries: None,
+			on_error: None,
 		}
 	}
 
@@ -142,6 +135,14 @@ where
 		self
 	}
 
+	pub fn on_error<F>(mut self, f: F) -> Self
+	where
+		F: Fn(LiveError) + Send + Sync + 'static,
+	{
+		self.on_error = Some(Arc::new(f));
+		self
+	}
+
 	pub fn build(self) -> Result<LiveDir<T>, LiveError> {
 		let store = self
 			.store
@@ -162,6 +163,7 @@ where
 			policy: self.policy,
 			max_entries: self.max_entries,
 			owned_keys: Arc::new(RwLock::new(HashSet::new())),
+			on_error: self.on_error,
 			#[cfg(feature = "signal")]
 			watch_state: None,
 		})
@@ -174,6 +176,32 @@ where
 {
 	fn default() -> Self {
 		Self::new()
+	}
+}
+
+impl<T> LiveDir<T> {
+	/// Stops the filesystem watcher.
+	///
+	/// The watcher is only stopped if this `LiveDir` instance is the last one holding
+	/// the active watcher. If other clones exist, they will continue watching.
+	#[cfg(feature = "signal")]
+	pub fn stop_watching(&mut self) {
+		if let Some(state) = self.watch_state.as_ref()
+			&& Arc::strong_count(state) == 1
+		{
+			if let Some(state) = self.watch_state.take()
+				&& let Ok(state) = Arc::try_unwrap(state)
+			{
+				state.watcher.stop();
+				state.abort_handle.abort();
+			}
+		}
+	}
+
+	/// Returns true if the watcher is currently active.
+	#[cfg(feature = "signal")]
+	pub fn is_watching(&self) -> bool {
+		self.watch_state.is_some()
 	}
 }
 
@@ -192,6 +220,7 @@ where
 			policy: UnloadPolicy::default(),
 			max_entries: None,
 			owned_keys: Arc::new(RwLock::new(HashSet::new())),
+			on_error: None,
 			#[cfg(feature = "signal")]
 			watch_state: None,
 		}
@@ -254,9 +283,7 @@ where
 	/// Must call `load()` before `start_watching()` to ensure the directory exists.
 	#[cfg(feature = "signal")]
 	pub async fn start_watching(&mut self, config: WatcherConfig) -> Result<(), LiveError> {
-		let watch_path = fs::canonicalize(&self.path)
-			.await
-			.map_err(|e| LiveError::Builder(format!("failed to canonicalize path: {}", e)))?;
+		let watch_path = fs::canonicalize(&self.path).await.map_err(LiveError::Io)?;
 
 		let target = Target::Directory(watch_path);
 		let watcher = Watcher::new(target, config)?;
@@ -270,12 +297,13 @@ where
 		let policy = self.policy;
 		let max_entries = self.max_entries;
 		let owned_keys = self.owned_keys.clone();
+		let on_error = self.on_error.clone();
 
 		let handle = tokio::spawn(async move {
 			while let Ok(_event) = rx.recv().await {
 				// On any change, rescan the entire directory
 
-				let _ = Self::do_scan(
+				if let Err(e) = Self::do_scan(
 					&store,
 					&loader,
 					&path,
@@ -285,9 +313,12 @@ where
 					max_entries,
 					&owned_keys,
 				)
-				.await;
+				.await && let Some(ref cb) = on_error
+				{
+					cb(e);
+				}
 
-				// Errors during watch are silently ignored.
+				// Errors during watch are silently ignored (except via callback).
 
 				// Use events feature to observe failures if needed.
 			}
@@ -307,23 +338,6 @@ where
 	pub async fn watch(mut self, config: WatcherConfig) -> Result<Self, LiveError> {
 		self.start_watching(config).await?;
 		Ok(self)
-	}
-
-	/// Stops the filesystem watcher.
-	#[cfg(feature = "signal")]
-	pub fn stop_watching(&mut self) {
-		if let Some(state) = self.watch_state.take()
-			&& let Ok(state) = Arc::try_unwrap(state)
-		{
-			state.watcher.stop();
-			state.abort_handle.abort();
-		}
-	}
-
-	/// Returns true if the watcher is currently active.
-	#[cfg(feature = "signal")]
-	pub fn is_watching(&self) -> bool {
-		self.watch_state.is_some()
 	}
 
 	/// Internal: Scan the directory and sync with store.
@@ -346,7 +360,7 @@ where
 	async fn do_scan(
 		store: &Arc<Store<T>>,
 		loader: &Arc<DynLoader>,
-		path: &PathBuf,
+		path: &std::path::Path,
 		pattern: &KeyPattern,
 		scan_mode: &ScanMode,
 		policy: UnloadPolicy,
@@ -356,13 +370,13 @@ where
 		let mut result = ScanResult::default();
 
 		// Check if directory exists
-		if !path.exists() {
+		if !tokio::fs::try_exists(path).await.unwrap_or(false) {
 			return Ok(result);
 		}
 
 		// Collect all valid entries from filesystem
-		// Store (key, relative_path for loader, absolute_path for source)
-		let mut fs_entries: HashMap<String, (String, PathBuf)> = HashMap::new();
+		// Store (key, load_name)
+		let mut fs_entries: HashMap<String, String> = HashMap::new();
 
 		let mut entries = fs::read_dir(path).await?;
 		while let Some(entry) = entries.next_entry().await? {
@@ -370,7 +384,7 @@ where
 			if let Some(max) = max_entries
 				&& fs_entries.len() >= max
 			{
-				return Err(LiveError::Builder(format!(
+				return Err(LiveError::LimitExceeded(format!(
 					"directory contains more than {} entries",
 					max
 				)));
@@ -390,20 +404,17 @@ where
 					if file_type.is_file()
 						&& let Some(key) = pattern.extract(&name)
 					{
-						let relative_path = name.to_string();
-						let absolute_path = entry.path();
-						fs_entries.insert(key, (relative_path, absolute_path));
+						// Full filename with extension
+						fs_entries.insert(key, name.to_string());
 					}
 				}
 				ScanMode::Subdirs { config_file } => {
 					if file_type.is_dir()
 						&& let Some(key) = pattern.extract(&name)
 					{
-						let config_path = entry.path().join(config_file);
-						if config_path.exists() {
-							let relative_path = format!("{}/{}", name, config_file);
-							fs_entries.insert(key, (relative_path, config_path));
-						}
+						// Base name without extension, let loader.load() probe
+						let base_name = format!("{}/{}", name, config_file);
+						fs_entries.insert(key, base_name);
 					}
 				}
 			}
@@ -413,14 +424,19 @@ where
 		let mut fs_keys: HashSet<String> = HashSet::new();
 
 		// Load all configs and insert/update in store
-		for (key, (relative_path, absolute_path)) in &fs_entries {
+		for (key, load_name) in &fs_entries {
 			let is_new = store.get(key).is_none();
 
-			match loader.load_file::<T>(relative_path).await {
+			// Files mode: load_file (exact path)
+			// Subdirs mode: load (probe extensions)
+			let load_result = match scan_mode {
+				ScanMode::Files => loader.load_file::<T>(load_name).await,
+				ScanMode::Subdirs { .. } => loader.load::<T>(load_name).await,
+			};
+
+			match load_result {
 				LoadResult::Ok { value, info } => {
-					let source_path = fs::canonicalize(&info.path)
-						.await
-						.unwrap_or_else(|_| absolute_path.clone());
+					let source_path = fs::canonicalize(&info.path).await.unwrap_or(info.path);
 					store.insert(key.clone(), value, source_path, policy);
 					fs_keys.insert(key.clone());
 
@@ -438,7 +454,8 @@ where
 					result.failed.push((key.clone(), e.to_string()));
 				}
 				LoadResult::NotFound => {
-					// Skip - file was deleted between listing and loading
+					// File does not exist (Subdirs mode where subdir exists but config file missing)
+					// Skip
 				}
 			}
 		}
