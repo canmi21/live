@@ -349,3 +349,54 @@ async fn test_live_dir_persistent_policy() -> Result<(), Box<dyn std::error::Err
 
 	Ok(())
 }
+
+#[tokio::test]
+async fn test_live_dir_watch_error_reporting() -> Result<(), Box<dyn std::error::Error>> {
+	let dir = tempfile::tempdir()?;
+	let dir_path = dir.path().to_path_buf();
+
+	// Create initial valid config
+	tokio::fs::write(dir_path.join("test.json"), b"{\"val\": 1}").await?;
+
+	let store = Arc::new(Store::<TestConfig>::new());
+	let source = FileSource::new(&dir_path);
+	let loader = DynLoader::builder()
+		.source(source)
+		.format(AnyFormat::Json)
+		.build()
+		.unwrap();
+
+	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
+	let mut live_dir = LiveDir::builder()
+		.store(store)
+		.loader(loader)
+		.path(&dir_path)
+		.on_error(move |err| {
+			let _ = tx.send(err);
+		})
+		.build()?;
+
+	live_dir.load().await?;
+	live_dir
+		.start_watching(live::signal::Config::default())
+		.await?;
+
+	// Write invalid JSON
+	tokio::fs::write(dir_path.join("test.json"), b"invalid json").await?;
+
+	// Wait for error
+	let err = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await?;
+	let err = err.ok_or("No error received")?;
+
+	// Verify error message format
+	let msg = err.to_string();
+	// LiveError::Load wraps FmtError::ParseError, which displays as "Load error: ..."
+	assert!(msg.contains("Load error"));
+	// We formatted it as "[{}] {}", key, err
+	assert!(msg.contains("[test]"));
+
+	live_dir.stop_watching();
+
+	Ok(())
+}
